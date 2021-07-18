@@ -19,23 +19,28 @@ const size_t slot_w64_count = slot_byte_count / 8;
 struct fastbloom* fastbloom_new(size_t slot_count, size_t probe_per_entry, size_t seed) {
 	struct fastbloom* bf = (struct fastbloom*)malloc(sizeof(struct fastbloom));
 	bf->slot_ptr = (atomic_ullong*)aligned_alloc(slot_byte_count, slot_count*slot_byte_count);
-	memset(bf->slot_ptr, 0, slot_count*slot_byte_count);
 	bf->slot_count = slot_count;
+	memset(bf->slot_ptr, 0, slot_count*slot_byte_count);
 	bf->probe_per_entry = probe_per_entry;
 	bf->seed = seed;
+	fastbloom_reset(bf);
 	return bf;
 }
 
-void fastbloom_release(struct fastbloom* fb) {
-	free(fb->slot_ptr);
-	free(fb);
+void fastbloom_reset(struct fastbloom* bf) {
+	memset(bf->slot_ptr, 0, bf->slot_count*slot_byte_count);
 }
 
-static bool fastbloom_op(struct fastbloom* fb, const void* data_ptr, size_t data_size, bool is_add) {
-	XXH128_hash_t hash = XXH3_128bits_withSeed(data_ptr, data_size, fb->seed);
+void fastbloom_release(struct fastbloom* bf) {
+	free(bf->slot_ptr);
+	free(bf);
+}
+
+static bool fastbloom_op(struct fastbloom* bf, const void* data_ptr, size_t data_size, bool is_add) {
+	XXH128_hash_t hash = XXH3_128bits_withSeed(data_ptr, data_size, bf->seed);
 	size_t bit_offset_in_slot = hash.low64 % slot_bit_count; //low64's lowest 9 bits as first bit_offset
-	size_t slot_idx = (hash.low64 / slot_bit_count) % fb->slot_count; //low64's high bits
-	atomic_ullong* curr_slot = fb->slot_ptr + (slot_w64_count*slot_idx);
+	size_t slot_idx = (hash.low64 / slot_bit_count) % bf->slot_count; //low64's high bits
+	atomic_ullong* curr_slot = bf->slot_ptr + (slot_w64_count*slot_idx);
 	size_t probe_count = 1;
 	while(1) {
 		size_t w64_idx = bit_offset_in_slot / 64;
@@ -50,12 +55,12 @@ static bool fastbloom_op(struct fastbloom* fb, const void* data_ptr, size_t data
 		}
 
 		probe_count++;
-		if(probe_count == fb->probe_per_entry) {
+		if(probe_count == bf->probe_per_entry) {
 			break;
 		}
 		bit_offset_in_slot = hash.high64 % slot_bit_count; //consume bits in high64 as bit_offset
 		if(probe_count == 8) { //generate more random bits
-			hash = XXH3_128bits_withSeed(data_ptr, data_size, fb->seed + 0x5A5A5A5A);
+			hash = XXH3_128bits_withSeed(data_ptr, data_size, bf->seed + 0x5A5A5A5A);
 		} else if(probe_count == 15) { //copy random bits from low64 to high64 for future use
 			hash.high64 = hash.low64;
 		} else { //shift out the consumed bits
@@ -65,17 +70,17 @@ static bool fastbloom_op(struct fastbloom* fb, const void* data_ptr, size_t data
 	return true;
 }
 
-void fastbloom_add(struct fastbloom* fb, const void* data_ptr, size_t data_size) {
-	fastbloom_op(fb, data_ptr, data_size, true);
+void fastbloom_add(struct fastbloom* bf, const void* data_ptr, size_t data_size) {
+	fastbloom_op(bf, data_ptr, data_size, true);
 }
 
-bool fastbloom_has(struct fastbloom* fb, const void* data_ptr, size_t data_size) {
-	return fastbloom_op(fb, data_ptr, data_size, false);
+bool fastbloom_has(struct fastbloom* bf, const void* data_ptr, size_t data_size) {
+	return fastbloom_op(bf, data_ptr, data_size, false);
 }
 
 void fastbloom_get_optimal_params(double target_false_positive_ration, size_t entry_count, size_t* slot_count, size_t* probe_per_entry) {
 	size_t bits_per_entry;
-	else if(target_false_positive_ration > 0.023220) {
+	if(target_false_positive_ration > 0.023220) {
 		bits_per_entry=8;  *probe_per_entry=6; 
 	} else if(target_false_positive_ration > 0.014895) {
 		bits_per_entry=9;  *probe_per_entry=7; 

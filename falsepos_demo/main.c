@@ -1,5 +1,7 @@
 #include "../fastbloom.c"
 
+// gcc -I.. -I./xxHash-0.8.0 -Wall main.c libxxhash.a 
+
 static void check_param(size_t bits_per_entry, size_t probe_per_entry) {
 	const int entry_count = 2500000;
 	printf("bits_per_entry %zu probe_per_entry %zu", bits_per_entry, probe_per_entry);
