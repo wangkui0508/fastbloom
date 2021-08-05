@@ -5,6 +5,10 @@
 #include "xxhash.h"
 #include "fastbloom.h"
 
+/*
+gcc -O3 -Wall -c -I ./falsepos_demo/xxHash-0.8.0 fastbloom.c
+ * */
+
 struct fastbloom {
 	atomic_ullong* slot_ptr;
 	size_t         slot_count;
@@ -13,8 +17,8 @@ struct fastbloom {
 };
 
 const size_t slot_byte_count = 64; //Intel CPUs have 64-byte cache lines
-const size_t slot_bit_count = slot_byte_count * 8;
-const size_t slot_w64_count = slot_byte_count / 8;
+const size_t slot_bit_count = 64 * 8;
+const size_t slot_w64_count = 64 / 8;
 
 struct fastbloom* fastbloom_new(size_t slot_count, size_t probe_per_entry, size_t seed) {
 	struct fastbloom* bf = (struct fastbloom*)malloc(sizeof(struct fastbloom));
@@ -114,8 +118,34 @@ void fastbloom_get_optimal_params(double target_false_positive_ration, size_t en
 		bits_per_entry=23; *probe_per_entry=13;
 	} else if(target_false_positive_ration > 0.000050) {
 		bits_per_entry=24; *probe_per_entry=13;
+	} else if(target_false_positive_ration > 0.000037) {
+		bits_per_entry=25; *probe_per_entry=13;
+	} else if(target_false_positive_ration > 0.000024) {
+		bits_per_entry=26; *probe_per_entry=13;
+	} else if(target_false_positive_ration > 0.000020) {
+		bits_per_entry=27; *probe_per_entry=14;
+	} else if(target_false_positive_ration > 0.000014) {
+		bits_per_entry=28; *probe_per_entry=15;
+	} else if(target_false_positive_ration > 0.000011) {
+		bits_per_entry=29; *probe_per_entry=15;
+	} else if(target_false_positive_ration > 0.000009) {
+		bits_per_entry=30; *probe_per_entry=15;
+	} else if(target_false_positive_ration > 0.000007) {
+		bits_per_entry=31; *probe_per_entry=15;
+	} else if(target_false_positive_ration > 0.000005) {
+		bits_per_entry=32; *probe_per_entry=15;
+	} else if(target_false_positive_ration > 0.000004) {
+		bits_per_entry=33; *probe_per_entry=15;
+	} else if(target_false_positive_ration > 0.000003) {
+		bits_per_entry=34; *probe_per_entry=15;
+	} else if(target_false_positive_ration > 0.000002) {
+		bits_per_entry=35; *probe_per_entry=15;
+	} else if(target_false_positive_ration > 0.000001) {
+		bits_per_entry=36; *probe_per_entry=16;
 	} else {
 		bits_per_entry=25; *probe_per_entry=14;
 	}
 	*slot_count = (bits_per_entry * entry_count + slot_bit_count - 1) / slot_bit_count;
 }
+
+
